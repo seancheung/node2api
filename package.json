@@ -1,0 +1,24 @@
+{
+  "name": "node2api",
+  "version": "0.1.0",
+  "main": "index.js",
+  "repository": "git@github.com:seancheung/node2api.git",
+  "author": "seancheung <theoxuanx@gmail.com>",
+  "license": "MIT",
+  "bin": "./dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.5",
+    "@types/yargs": "^17.0.8",
+    "typescript": "^4.5.4"
+  },
+  "dependencies": {
+    "ts-morph": "^13.0.2",
+    "yargs": "^17.3.1"
+  }
+}
