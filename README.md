@@ -2,10 +2,38 @@
 
 A CLI plugin to generate client request SDK from nodejs server projects
 
+## Installation
+
+```bash
+$ npm i -g node2api
+```
+
+> You may also install locally
+
 ## Usage
 
 ```bash
-node2api [--config file] [--stream] [--help]
+$ node2api [--config file] [--stream] [--help]
+```
+
+Local usage
+
+```bash
+$ npm i -D node2api
+```
+
+package.json
+
+```json
+{
+  "scripts": {
+    "sync": "node2api"
+  }
+}
+```
+
+```bash
+$ npm run sync
 ```
 
 ## Config
