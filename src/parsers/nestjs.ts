@@ -135,6 +135,7 @@ function* createFunctions(
       parameters: parameters.map(({ parameter }) => ({
         name: parameter.getName(),
         type: parameter.getType().getText(null, TypeFormatFlags.None),
+        hasQuestionToken: parameter.hasQuestionToken(),
       })),
       statements: printNode(
         createRequestStatement(
@@ -220,6 +221,8 @@ function* createRequestOptions(
       createMergedObjectExpression(query),
     );
   }
+  /*
+  // usually headers are not passed per-method
   const headers = parameters.filter((e) => e.decorator.getName() === 'Headers');
   if (headers.length) {
     yield ts.factory.createPropertyAssignment(
@@ -227,6 +230,7 @@ function* createRequestOptions(
       createMergedObjectExpression(headers),
     );
   }
+  */
   const body = parameters.filter((e) => e.decorator.getName() === 'Body');
   if (body.length) {
     yield ts.factory.createPropertyAssignment(
