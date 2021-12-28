@@ -135,7 +135,7 @@ function* createFunctions(
       parameters: parameters.map(({ parameter }) => ({
         name: parameter.getName(),
         type: parameter.getType().getText(null, TypeFormatFlags.None),
-        hasQuestionToken: parameter.hasQuestionToken(),
+        hasQuestionToken: parameter.isOptional(),
       })),
       statements: printNode(
         createRequestStatement(
