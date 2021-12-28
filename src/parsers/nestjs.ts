@@ -279,8 +279,8 @@ function createMergedObjectExpression(
   const map = new Map<string, string>();
   for (const param of parameters) {
     const args = param.decorator.getArguments();
-    if (!args.length) {
-      // if a complete injection(e.g. `@Body()`) occurs, return it immediately
+    if (!args.length || args[0].getKind() !== SyntaxKind.StringLiteral) {
+      // if an injection without property name occurs(e.g. `@Body()`, `@Body(new ValidationPipe())`), return it immediately
       return ts.factory.createIdentifier(param.parameter.getName());
     }
     const name = args[0].asKind(SyntaxKind.StringLiteral).getLiteralText();
