@@ -68,6 +68,7 @@ class NestjsParser extends Parser {
             name: struct.name,
             isExported: true,
             typeParameters: struct.typeParameters,
+            extends: [struct.extends],
             properties: struct.properties.map((prop) => ({
               name: prop.name,
               type: prop.type,
