@@ -20,7 +20,7 @@ export namespace Config {
      */
     sources: string | string[];
     /**
-     * Source files including dto/entity or any classes/interfaces used by client
+     * Source files including dto/entity or any classes/interfaces/enums used by client
      */
     types?: string[];
   }

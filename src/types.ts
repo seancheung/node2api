@@ -1,4 +1,5 @@
 import type {
+  EnumDeclarationStructure,
   InterfaceDeclarationStructure,
   ModuleDeclarationStructure,
   OptionalKind,
@@ -19,12 +20,12 @@ export abstract class Parser extends ContextConsumer {
     files: Iterable<SourceFile>,
   ): Iterable<OptionalKind<ModuleDeclarationStructure>>;
   /**
-   * Create Interfaces from source files
+   * Create interfaces/enums from source files
    * @param files DTO/entity source files
    */
-  abstract createInterfaces(
+  abstract createTypes(
     files: Iterable<SourceFile>,
-  ): Iterable<OptionalKind<InterfaceDeclarationStructure>>;
+  ): Iterable<InterfaceDeclarationStructure | EnumDeclarationStructure>;
 }
 
 export abstract class Writer extends ContextConsumer {

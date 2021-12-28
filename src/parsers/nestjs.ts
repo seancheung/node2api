@@ -1,5 +1,6 @@
 import {
   Decorator,
+  EnumDeclarationStructure,
   FunctionDeclarationStructure,
   InterfaceDeclarationStructure,
   MethodDeclaration,
@@ -45,10 +46,15 @@ class NestjsParser extends Parser {
       }
     }
   }
-  *createInterfaces(
+  *createTypes(
     files: Iterable<SourceFile>,
-  ): Iterable<OptionalKind<InterfaceDeclarationStructure>> {
+  ): Iterable<InterfaceDeclarationStructure | EnumDeclarationStructure> {
     for (const file of files) {
+      for (const decl of file.getEnums()) {
+        if (decl.isExported()) {
+          yield decl.getStructure();
+        }
+      }
       for (const decl of file.getInterfaces()) {
         if (decl.isExported()) {
           yield decl.getStructure();
@@ -58,6 +64,7 @@ class NestjsParser extends Parser {
         if (decl.isExported()) {
           const struct = decl.getStructure();
           yield {
+            kind: StructureKind.Interface,
             name: struct.name,
             isExported: true,
             properties: struct.properties.map((prop) => ({

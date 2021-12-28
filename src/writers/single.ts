@@ -1,5 +1,5 @@
 import path from 'path';
-import { Project, ts } from 'ts-morph';
+import { Project, StructureKind, ts } from 'ts-morph';
 import { Writer } from '../types';
 
 class SingleWiter extends Writer {
@@ -22,9 +22,18 @@ class SingleWiter extends Writer {
       moduleSpecifier: this.resolveHttpModule(),
     });
 
-    // create modules and interfaces
+    // create modules and types
     src.addModules(Array.from(parser.createModules(controllers)));
-    src.addInterfaces(Array.from(parser.createInterfaces(types)));
+    for (const type of parser.createTypes(types)) {
+      switch (type.kind) {
+        case StructureKind.Interface:
+          src.addInterface(type);
+          break;
+        case StructureKind.Enum:
+          src.addEnum(type);
+          break;
+      }
+    }
 
     // write to filesystem or stream
     if (stream) {

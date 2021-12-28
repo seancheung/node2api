@@ -51,7 +51,7 @@ Here is an example
       "!./server/src/health/**/*.ts"
     ],
     "types": [
-      "./server/src/**/*.dto.ts",
+      "./server/src/**/*.{dto,entity}.ts",
       "./server/types/**/*.d.ts",
       "!./server/types/config.d.ts"
     ]
@@ -94,7 +94,7 @@ export namespace Config {
      */
     sources: string | string[];
     /**
-     * Source files including dto/entity or any classes/interfaces used by client
+     * Source files including dto/entity or any classes/interfaces/enums used by client
      */
     types?: string[];
   }
