@@ -67,6 +67,7 @@ class NestjsParser extends Parser {
             kind: StructureKind.Interface,
             name: struct.name,
             isExported: true,
+            typeParameters: struct.typeParameters,
             properties: struct.properties.map((prop) => ({
               name: prop.name,
               type: prop.type,
