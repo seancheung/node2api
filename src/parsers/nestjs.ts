@@ -144,6 +144,7 @@ function* createFunctions(
           parameters,
         ),
       ),
+      docs: method.getJsDocs()?.map((e) => e.getStructure()),
     };
   }
 }
