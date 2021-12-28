@@ -38,7 +38,7 @@ class NestjsParser extends Parser {
         const [name] = file.getBaseNameWithoutExtension().split('.', 1);
         const functions = createFunctions(decl.getMethods(), basePath);
         yield {
-          name,
+          name: name.toUpperCase(),
           isExported: true,
           statements: Array.from(functions),
         };
