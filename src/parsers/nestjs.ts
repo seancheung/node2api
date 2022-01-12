@@ -273,7 +273,7 @@ function createUrlStringExpression(
         ts.factory.createIdentifier(exp.slice(1)),
         i < spans.length - 1
           ? ts.factory.createTemplateMiddle('/' + literal)
-          : ts.factory.createTemplateTail(''),
+          : ts.factory.createTemplateTail(literal ? '/' + literal : ''),
       );
     }),
   );
