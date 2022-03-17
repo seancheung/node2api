@@ -100,6 +100,10 @@ function getLiteralPath(node: Node<ts.Node>, allowObject?: boolean) {
       return getLiteralPath(
         node.asKind(SyntaxKind.ObjectLiteralExpression).getProperty('path'),
       );
+    case SyntaxKind.PropertyAssignment:
+      return getLiteralPath(
+        node.asKind(SyntaxKind.PropertyAssignment).getInitializer(),
+      );
     default:
       throw new Error('unknown argument type');
   }
