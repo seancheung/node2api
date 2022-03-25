@@ -42,6 +42,7 @@ class NestjsParser extends Parser {
           name: name.toUpperCase(),
           isExported: true,
           statements: Array.from(functions),
+          docs: decl.getJsDocs()?.map((e) => e.getStructure()),
         };
       }
     }
