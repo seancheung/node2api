@@ -4,6 +4,7 @@ import type {
   ModuleDeclarationStructure,
   OptionalKind,
   SourceFile,
+  TypeAliasDeclarationStructure,
 } from 'ts-morph';
 import { Config } from './config';
 
@@ -25,7 +26,11 @@ export abstract class Parser extends ContextConsumer {
    */
   abstract createTypes(
     files: Iterable<SourceFile>,
-  ): Iterable<InterfaceDeclarationStructure | EnumDeclarationStructure>;
+  ): Iterable<
+    | InterfaceDeclarationStructure
+    | EnumDeclarationStructure
+    | TypeAliasDeclarationStructure
+  >;
 }
 
 export abstract class Writer extends ContextConsumer {

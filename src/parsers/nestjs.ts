@@ -13,6 +13,7 @@ import {
   StructureKind,
   SyntaxKind,
   ts,
+  TypeAliasDeclarationStructure,
   TypeFormatFlags,
 } from 'ts-morph';
 import { Parser } from '../types';
@@ -49,7 +50,11 @@ class NestjsParser extends Parser {
   }
   *createTypes(
     files: Iterable<SourceFile>,
-  ): Iterable<InterfaceDeclarationStructure | EnumDeclarationStructure> {
+  ): Iterable<
+    | InterfaceDeclarationStructure
+    | EnumDeclarationStructure
+    | TypeAliasDeclarationStructure
+  > {
     for (const file of files) {
       for (const decl of file.getEnums()) {
         if (decl.isExported()) {
@@ -61,15 +66,25 @@ class NestjsParser extends Parser {
           yield decl.getStructure();
         }
       }
+      for (const decl of file.getTypeAliases()) {
+        if (decl.isExported()) {
+          yield decl.getStructure();
+        }
+      }
       for (const decl of file.getClasses()) {
         if (decl.isExported()) {
           const struct = decl.getStructure();
+          const imps = struct.implements
+            ? Array.isArray(struct.implements)
+              ? struct.implements
+              : [struct.implements]
+            : [];
           yield {
             kind: StructureKind.Interface,
             name: struct.name,
             isExported: true,
             typeParameters: struct.typeParameters,
-            extends: [struct.extends],
+            extends: [struct.extends, ...imps],
             properties: struct.properties.map((prop) => ({
               name: prop.name,
               type: prop.type,
@@ -284,7 +299,7 @@ function createUrlStringExpression(
   );
 }
 /**
- * Merge scattered params. e.g. `@Body('name')` and `@Body('id')` to `{ name, id }`
+ * Merge partially injected params. e.g. `@Body('name')` and `@Body('id')` to `{ name, id }`
  * @param parameters Legal parameters
  * @returns Merged object literal expression
  */

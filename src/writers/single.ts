@@ -32,6 +32,9 @@ class SingleWiter extends Writer {
         case StructureKind.Enum:
           src.addEnum(type);
           break;
+        case StructureKind.TypeAlias:
+          src.addTypeAlias(type);
+          break;
       }
     }
 
