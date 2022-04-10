@@ -31,31 +31,36 @@ async function run({ config, stream }: Options) {
     throw new Error(`Config file not found at path "${configPath}"`);
   }
   const configContent = readFileSync(configPath, 'utf-8');
-  let configData: Config;
+  let configData: Config | Config[];
   try {
     configData = JSON.parse(configContent);
   } catch (error) {
     throw new Error('Invalid config content');
   }
+  if (Array.isArray(configData)) {
+    await Promise.all(configData.map((e) => runTask(e, stream)));
+  } else {
+    runTask(configData, stream);
+  }
+}
+
+async function runTask(config: Config, stream?: boolean) {
   let writer: Writer;
   let parser: Parser;
   const {
     client: { emitMode = 'single' },
     server: { type = 'nestjs' },
-  } = configData;
+  } = config;
   switch (type) {
     case 'nestjs':
-      parser = new (await import('./parsers/nestjs')).default(configData);
+      parser = new (await import('./parsers/nestjs')).default(config);
       break;
     default:
       throw new Error('unknown server type');
   }
   switch (emitMode) {
     case 'single':
-      writer = new (await import('./writers/single')).default(
-        configData,
-        parser,
-      );
+      writer = new (await import('./writers/single')).default(config, parser);
       break;
     default:
       throw new Error('unknown emit mode');

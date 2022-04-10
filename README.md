@@ -140,3 +140,7 @@ export namespace Config {
   }
 }
 ```
+
+### Batch mode
+
+Config can be an array to enable batch mode
