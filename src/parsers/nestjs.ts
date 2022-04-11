@@ -166,6 +166,7 @@ function* createFunctions(
         type: parameter.getType().getText(null, TypeFormatFlags.None),
         hasQuestionToken: parameter.isOptional(),
       })),
+      typeParameters: method.getTypeParameters().map((e) => e.getStructure()),
       statements: printNode(
         createRequestStatement(
           verb.getName().toLowerCase(),
