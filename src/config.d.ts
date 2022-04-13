@@ -1,49 +1,47 @@
-export interface Config {
+export interface Config<
+  T extends Config.Input = Config.Input,
+  U extends Config.Output = Config.Output,
+> {
   /**
-   * Nodejs server config
+   * Input config
    */
-  server: Config.Server;
+  input: T;
   /**
-   * Http client sdk config
+   * Output config
    */
-  client: Config.Client;
+  output: U;
 }
 export namespace Config {
-  export interface Server {
+  export type Input = NestjsInput;
+  export interface NestjsInput {
     /**
-     * Type of server framework. Default is `nestjs`
-     * @default 'nestjs''
+     * Input parser type
      */
-    type?: Server.Type;
+    parser: 'nestjs';
     /**
      * Source files including controllers. Globs are allowed
      */
     sources: string | string[];
     /**
-     * Source files including dto/entity or any classes/interfaces/enums used by client
+     * Source files including dto/entity or any classes/interfaces/enums used in controllers
      */
-    types?: string[];
+    types?: string | string[];
   }
-  export interface Client {
+  export type Output = AxiosOutput;
+  export interface AxiosOutput {
     /**
-     * Type of http lib used by client. Default is `axios`
-     * @default 'axios''
+     * Output writer type
      */
-    type?: Client.Type;
+    writer: 'axios';
     /**
-     * Output file path
+     * Output file path. If a single string is provided, requests and types will be written to the same file.
      */
-    target: string;
+    dest: AxiosOutput.Destination | string;
     /**
      * Http module file path. This module must export a default http client(e.g. `export default axios.create()`).
-     * If omitted, module set with `type` will be used instead.
+     * If omitted, `import axios from 'axios'` will be used instead.
      */
     httpModule?: string;
-    /**
-     * Output mode. Default is `single`
-     * @default 'single'
-     */
-    emitMode?: Client.Mode;
     /**
      * Comment prepended to the output file
      */
@@ -51,17 +49,22 @@ export namespace Config {
     /**
      * Code formatting settings
      */
-    formatSettings?: Client.FormatSettings;
+    formatSettings?: AxiosOutput.FormatSettings;
   }
-  export namespace Server {
-    export type Type = 'nestjs';
-  }
-  export namespace Client {
-    export type Type = 'axios';
-    export type Mode = 'single';
+  export namespace AxiosOutput {
     export interface FormatSettings {
       indentSize?: number;
       semicolons?: 'ignore' | 'insert' | 'remove';
+    }
+    export interface Destination {
+      /**
+       * Requests output file path
+       */
+      requestFile: string;
+      /**
+       * Types output file path
+       */
+      typesFile: string;
     }
   }
 }
