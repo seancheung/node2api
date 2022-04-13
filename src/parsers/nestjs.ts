@@ -4,11 +4,11 @@ import {
   FunctionDeclarationStructure,
   InterfaceDeclarationStructure,
   MethodDeclaration,
-  ModuleDeclarationStructure,
   Node,
   OptionalKind,
   ParameterDeclaration,
   printNode,
+  Project,
   SourceFile,
   StructureKind,
   SyntaxKind,
@@ -16,6 +16,7 @@ import {
   TypeAliasDeclarationStructure,
   TypeFormatFlags,
 } from 'ts-morph';
+import { Config } from '../config';
 import { Parser } from '../types';
 
 const ControllerDecoratorName = 'Controller';
@@ -27,10 +28,18 @@ interface DecoratedParameter {
 }
 
 class NestjsParser extends Parser {
-  *createModules(
-    files: Iterable<SourceFile>,
-  ): Iterable<OptionalKind<ModuleDeclarationStructure>> {
-    for (const file of files) {
+  private readonly controllerSrcFiles: Iterable<SourceFile>;
+  private readonly typeSrcFiles: Iterable<SourceFile>;
+
+  constructor(protected readonly config: Config.NestjsInput) {
+    super(config);
+    const project = new Project();
+    this.controllerSrcFiles = project.addSourceFilesAtPaths(config.sources);
+    this.typeSrcFiles = project.addSourceFilesAtPaths(config.types);
+  }
+
+  *getControllers(): Iterable<Parser.Controller> {
+    for (const file of this.controllerSrcFiles) {
       for (const decl of file.getClasses()) {
         const ctrl = decl.getDecorator(ControllerDecoratorName);
         if (!ctrl) {
@@ -41,21 +50,19 @@ class NestjsParser extends Parser {
         const functions = createFunctions(decl.getMethods(), basePath);
         yield {
           name: name.toUpperCase(),
-          isExported: true,
-          statements: Array.from(functions),
+          requests: functions,
           docs: decl.getJsDocs()?.map((e) => e.getStructure()),
         };
       }
     }
   }
-  *createTypes(
-    files: Iterable<SourceFile>,
-  ): Iterable<
+
+  *getTypes(): Iterable<
     | InterfaceDeclarationStructure
     | EnumDeclarationStructure
     | TypeAliasDeclarationStructure
   > {
-    for (const file of files) {
+    for (const file of this.typeSrcFiles) {
       for (const decl of file.getEnums()) {
         if (decl.isExported()) {
           yield decl.getStructure();
@@ -139,7 +146,7 @@ function getControllerPath(decorator: Decorator) {
 function* createFunctions(
   methods: MethodDeclaration[],
   basePath: string,
-): Iterable<FunctionDeclarationStructure> {
+): Iterable<OptionalKind<FunctionDeclarationStructure>> {
   for (const method of methods) {
     const verb = method
       .getDecorators()
@@ -157,7 +164,6 @@ function* createFunctions(
       returnType = `Promise<${returnType}>`;
     }
     yield {
-      kind: StructureKind.Function,
       name: method.getName(),
       isExported: true,
       returnType,
@@ -214,7 +220,7 @@ function createRequestStatement(
   verb: string,
   url: string,
   parameters: DecoratedParameter[],
-): ts.Node {
+): ts.Statement {
   const opts = createRequestOptions(verb, url, parameters);
   const request = ts.factory.createPropertyAccessExpression(
     ts.factory.createIdentifier('http'),
