@@ -59,6 +59,9 @@ async function runTask(config: Config, stream?: boolean) {
     case 'axios':
       writer = new (await import('./writers/axios')).default(output, parser);
       break;
+    case 'openapi':
+      writer = new (await import('./writers/openapi')).default(output, parser);
+      break;
     default:
       throw new Error('unknown emit mode');
   }

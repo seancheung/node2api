@@ -27,7 +27,7 @@ export namespace Config {
      */
     types?: string | string[];
   }
-  export type Output = AxiosOutput;
+  export type Output = AxiosOutput | OpenAPIOutput;
   export interface AxiosOutput {
     /**
      * Output writer type
@@ -69,6 +69,31 @@ export namespace Config {
        * Types output file path
        */
       typesFile: string;
+    }
+  }
+  export interface OpenAPIOutput {
+    /**
+     * Output writer type
+     */
+    writer: 'openapi';
+    /**
+     * Output file path
+     */
+    dest: string;
+    /**
+     * OpenAPI specification version
+     */
+    spec: '3.0';
+    /**
+     * API info
+     */
+    info: OpenAPIOutput.Info;
+  }
+  export namespace OpenAPIOutput {
+    export interface Info {
+      title: string;
+      version: string;
+      description?: string;
     }
   }
 }
