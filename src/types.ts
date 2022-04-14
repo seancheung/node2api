@@ -1,10 +1,13 @@
 import type {
-  EnumDeclarationStructure,
-  FunctionDeclarationStructure,
-  InterfaceDeclarationStructure,
-  JSDocStructure,
-  OptionalKind,
-  TypeAliasDeclarationStructure,
+  ClassDeclaration,
+  EnumDeclaration,
+  InterfaceDeclaration,
+  JSDoc,
+  MethodDeclaration,
+  ParameterDeclaration,
+  ts,
+  Type,
+  TypeAliasDeclaration,
 } from 'ts-morph';
 import { Config } from './config';
 
@@ -20,17 +23,32 @@ export abstract class Parser {
    * Create interfaces/enums from source files
    */
   abstract getTypes(): Iterable<
-    | InterfaceDeclarationStructure
-    | EnumDeclarationStructure
-    | TypeAliasDeclarationStructure
+    | EnumDeclaration
+    | InterfaceDeclaration
+    | ClassDeclaration
+    | TypeAliasDeclaration
   >;
 }
 
 export namespace Parser {
   export interface Controller {
     name: string;
-    requests: Iterable<OptionalKind<FunctionDeclarationStructure>>;
-    docs?: Array<OptionalKind<JSDocStructure>>;
+    baseUrl: string;
+    docs: JSDoc[];
+    requests: Iterable<Request>;
+  }
+  export interface Request {
+    url: string;
+    method: string;
+    params?: PartialParameterDeclaration[];
+    query?: ParameterDeclaration | PartialParameterDeclaration[];
+    data?: ParameterDeclaration | PartialParameterDeclaration[];
+    res: Type<ts.Type>;
+    func: MethodDeclaration;
+  }
+  export interface PartialParameterDeclaration {
+    property: string;
+    parameter: ParameterDeclaration;
   }
 }
 

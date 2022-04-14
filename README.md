@@ -60,6 +60,7 @@ Here is an example
     "writer": "axios",
     "dest": "./client/src/api/index.ts",
     "httpModule": "./client/src/api/http.ts",
+    "options": "opts",
     "comment": "/* eslint-disable */\n/* AUTO GENERATED. DO NOT CHANGE */",
     "formatSettings": {
       "indentSize": 2

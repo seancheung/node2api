@@ -43,6 +43,10 @@ export namespace Config {
      */
     httpModule?: string;
     /**
+     * Add an extra options parameter with the given name to each request function if specified
+     */
+    options?: string;
+    /**
      * Comment prepended to the output file
      */
     comment?: string;
