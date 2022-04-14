@@ -45,22 +45,19 @@ async function run({ config, stream }: Options) {
 }
 
 async function runTask(config: Config, stream?: boolean) {
-  let writer: Writer;
   let parser: Parser;
-  const {
-    client: { emitMode = 'single' },
-    server: { type = 'nestjs' },
-  } = config;
-  switch (type) {
+  let writer: Writer;
+  const { input, output } = config;
+  switch (input.parser) {
     case 'nestjs':
-      parser = new (await import('./parsers/nestjs')).default(config);
+      parser = new (await import('./parsers/nestjs')).default(input);
       break;
     default:
       throw new Error('unknown server type');
   }
-  switch (emitMode) {
-    case 'single':
-      writer = new (await import('./writers/single')).default(config, parser);
+  switch (output.writer) {
+    case 'axios':
+      writer = new (await import('./writers/axios')).default(output, parser);
       break;
     default:
       throw new Error('unknown emit mode');

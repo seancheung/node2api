@@ -1,101 +1,205 @@
 import {
+  ClassDeclaration,
   Decorator,
-  EnumDeclarationStructure,
-  FunctionDeclarationStructure,
-  InterfaceDeclarationStructure,
+  EnumDeclaration,
+  InterfaceDeclaration,
   MethodDeclaration,
-  ModuleDeclarationStructure,
   Node,
-  OptionalKind,
   ParameterDeclaration,
-  printNode,
+  Project,
   SourceFile,
-  StructureKind,
   SyntaxKind,
   ts,
-  TypeAliasDeclarationStructure,
+  Type,
+  TypeAliasDeclaration,
   TypeFormatFlags,
 } from 'ts-morph';
+import { Config } from '../config';
 import { Parser } from '../types';
 
-const ControllerDecoratorName = 'Controller';
 const MethodDecoratorNames = ['Get', 'Post', 'Put', 'Patch', 'Delete'];
-const ParameterDecoratorsNames = ['Param', 'Body', 'Query', 'Headers'];
-interface DecoratedParameter {
-  parameter: ParameterDeclaration;
-  decorator: Decorator;
-}
 
 class NestjsParser extends Parser {
-  *createModules(
-    files: Iterable<SourceFile>,
-  ): Iterable<OptionalKind<ModuleDeclarationStructure>> {
-    for (const file of files) {
-      for (const decl of file.getClasses()) {
-        const ctrl = decl.getDecorator(ControllerDecoratorName);
-        if (!ctrl) {
+  private readonly controllerSrcFiles: Iterable<SourceFile>;
+  private readonly typeSrcFiles: Iterable<SourceFile>;
+
+  constructor(protected readonly config: Config.NestjsInput) {
+    super(config);
+    const project = new Project();
+    this.controllerSrcFiles = project.addSourceFilesAtPaths(config.sources);
+    this.typeSrcFiles = project.addSourceFilesAtPaths(config.types);
+  }
+
+  *getControllers(): Iterable<Parser.Controller> {
+    for (const src of this.controllerSrcFiles) {
+      for (const type of src.getClasses()) {
+        const deco = type.getDecorator('Controller');
+        if (!deco) {
           continue;
         }
-        const basePath = getControllerPath(ctrl);
-        const [name] = file.getBaseNameWithoutExtension().split('.', 1);
-        const functions = createFunctions(decl.getMethods(), basePath);
+        const [name] = src.getBaseNameWithoutExtension().split('.', 1);
+        const baseUrl = this.getBaseUrl(deco);
+        const docs = type.getJsDocs();
+        const requests = this.getRequests(type);
         yield {
-          name: name.toUpperCase(),
-          isExported: true,
-          statements: Array.from(functions),
-          docs: decl.getJsDocs()?.map((e) => e.getStructure()),
+          name,
+          baseUrl,
+          docs,
+          requests,
         };
       }
     }
   }
-  *createTypes(
-    files: Iterable<SourceFile>,
-  ): Iterable<
-    | InterfaceDeclarationStructure
-    | EnumDeclarationStructure
-    | TypeAliasDeclarationStructure
+
+  *getTypes(): Iterable<
+    | EnumDeclaration
+    | InterfaceDeclaration
+    | ClassDeclaration
+    | TypeAliasDeclaration
   > {
-    for (const file of files) {
-      for (const decl of file.getEnums()) {
-        if (decl.isExported()) {
-          yield decl.getStructure();
-        }
+    for (const src of this.typeSrcFiles) {
+      yield* src.getEnums().filter((type) => type.isExported());
+      yield* src.getInterfaces().filter((type) => type.isExported());
+      yield* src.getClasses().filter((type) => type.isExported());
+      yield* src.getTypeAliases().filter((type) => type.isExported());
+    }
+  }
+
+  protected *getRequests(type: ClassDeclaration): Iterable<Parser.Request> {
+    for (const method of type.getMethods()) {
+      const verb = this.getVerb(method);
+      if (!verb) {
+        continue;
       }
-      for (const decl of file.getInterfaces()) {
-        if (decl.isExported()) {
-          yield decl.getStructure();
-        }
-      }
-      for (const decl of file.getTypeAliases()) {
-        if (decl.isExported()) {
-          yield decl.getStructure();
-        }
-      }
-      for (const decl of file.getClasses()) {
-        if (decl.isExported()) {
-          const struct = decl.getStructure();
-          const imps = struct.implements
-            ? Array.isArray(struct.implements)
-              ? struct.implements
-              : [struct.implements]
-            : [];
-          yield {
-            kind: StructureKind.Interface,
-            name: struct.name,
-            isExported: true,
-            typeParameters: struct.typeParameters,
-            extends: [struct.extends, ...imps],
-            properties: struct.properties.map((prop) => ({
-              name: prop.name,
-              type: prop.type,
-              hasQuestionToken: prop.hasQuestionToken,
-              docs: prop.docs,
-            })),
-            docs: struct.docs,
-          };
-        }
+      const url = this.getUrl(verb);
+      const params = this.getParams(method);
+      const query = this.getQuery(method);
+      const data = this.getData(method);
+      const res = this.getReturnType(method);
+      yield {
+        url,
+        method: verb.getName().toLowerCase(),
+        params,
+        query,
+        data,
+        res,
+        func: method,
+      };
+    }
+  }
+
+  protected getReturnType(method: MethodDeclaration): Type<ts.Type> {
+    const type = method.getReturnType();
+    const targetType = type.getTargetType();
+    if (targetType) {
+      if (targetType.getText(null, TypeFormatFlags.None) === 'Promise<T>') {
+        return type.getTypeArguments()[0];
       }
     }
+    return type;
+  }
+
+  protected getData(
+    method: MethodDeclaration,
+  ): ParameterDeclaration | Parser.PartialParameterDeclaration[] | undefined {
+    const pairs = method
+      .getParameters()
+      .map((p) => ({ p, d: p.getDecorator('Body') }))
+      .filter((p) => p.d);
+    if (!pairs.length) {
+      return;
+    }
+    const partials: Parser.PartialParameterDeclaration[] = [];
+    for (const pair of pairs) {
+      const property = pair.d
+        .getArguments()[0]
+        ?.asKind(SyntaxKind.StringLiteral)
+        ?.getLiteralText();
+      if (!property) {
+        // if an injection without property name occurs(e.g. `@Body()`, `@Body(new ValidationPipe())`), return it immediately
+        return pair.p;
+      }
+      partials.push({ property, parameter: pair.p });
+    }
+    if (partials.length) {
+      return partials;
+    }
+  }
+
+  protected getQuery(
+    method: MethodDeclaration,
+  ): ParameterDeclaration | Parser.PartialParameterDeclaration[] | undefined {
+    const pairs = method
+      .getParameters()
+      .map((p) => ({ p, d: p.getDecorator('Query') }))
+      .filter((p) => p.d);
+    if (!pairs.length) {
+      return;
+    }
+    const partials: Parser.PartialParameterDeclaration[] = [];
+    for (const pair of pairs) {
+      const property = pair.d
+        .getArguments()[0]
+        ?.asKind(SyntaxKind.StringLiteral)
+        ?.getLiteralText();
+      if (!property) {
+        // if an injection without property name occurs(e.g. `@Query()`, `@Query(new ValidationPipe())`), return it immediately
+        return pair.p;
+      }
+      partials.push({ property, parameter: pair.p });
+    }
+    if (partials.length) {
+      return partials;
+    }
+  }
+
+  protected getParams(
+    method: MethodDeclaration,
+  ): Parser.PartialParameterDeclaration[] | undefined {
+    const pairs = method
+      .getParameters()
+      .map((p) => ({ p, d: p.getDecorator('Param') }))
+      .filter((p) => p.d);
+    if (!pairs.length) {
+      return;
+    }
+    const partials: Parser.PartialParameterDeclaration[] = [];
+    for (const pair of pairs) {
+      const property = pair.d
+        .getArguments()[0]
+        ?.asKind(SyntaxKind.StringLiteral)
+        ?.getLiteralText();
+      if (!property) {
+        // if an injection without property name occurs(e.g. `@Param()`, `@Param(new ValidationPipe())`), throw an exception
+        throw new Error('`@Param()` without property name is not supported');
+      }
+      partials.push({ property, parameter: pair.p });
+    }
+    if (partials.length) {
+      return partials;
+    }
+  }
+
+  protected getUrl(deco: Decorator): string {
+    const args = deco.getArguments();
+    if (!args.length) {
+      return '';
+    }
+    return getLiteralPath(args[0]);
+  }
+
+  protected getVerb(method: MethodDeclaration): Decorator {
+    return method.getDecorator((e) =>
+      MethodDecoratorNames.includes(e.getName()),
+    );
+  }
+
+  protected getBaseUrl(deco: Decorator): string {
+    const args = deco.getArguments();
+    if (!args.length) {
+      return '';
+    }
+    return getLiteralPath(args[0], true);
   }
 }
 
@@ -123,205 +227,6 @@ function getLiteralPath(node: Node<ts.Node>, allowObject?: boolean) {
     default:
       throw new Error('unknown argument type');
   }
-}
-function getControllerPath(decorator: Decorator) {
-  const args = decorator.getArguments();
-  if (!args.length) {
-    return '';
-  }
-  return getLiteralPath(args[0], true);
-}
-/**
- * Create requestion functions(e.g. `function findUser(id: number): Promise<User> {}`)
- * @param methods Controller methods
- * @param basePath Request url base path
- */
-function* createFunctions(
-  methods: MethodDeclaration[],
-  basePath: string,
-): Iterable<FunctionDeclarationStructure> {
-  for (const method of methods) {
-    const verb = method
-      .getDecorators()
-      .find((e) => MethodDecoratorNames.includes(e.getName()));
-    if (!verb) {
-      continue;
-    }
-    const localPath = getMethodPath(verb);
-    const fullPath = joinPaths(basePath, localPath);
-    const parameters = getMethodDecoratedParameters(method);
-    const returnTypeNode = method.getReturnType();
-    let returnType = returnTypeNode.getText(null, TypeFormatFlags.None);
-    if (returnTypeNode.getTargetType() === undefined) {
-      // in case of a non-async controller function
-      returnType = `Promise<${returnType}>`;
-    }
-    yield {
-      kind: StructureKind.Function,
-      name: method.getName(),
-      isExported: true,
-      returnType,
-      parameters: parameters.map(({ parameter }) => ({
-        name: parameter.getName(),
-        type: parameter.getType().getText(null, TypeFormatFlags.None),
-        hasQuestionToken: parameter.isOptional(),
-      })),
-      typeParameters: method.getTypeParameters().map((e) => e.getStructure()),
-      statements: printNode(
-        createRequestStatement(
-          verb.getName().toLowerCase(),
-          fullPath,
-          parameters,
-        ),
-      ),
-      docs: method.getJsDocs()?.map((e) => e.getStructure()),
-    };
-  }
-}
-function getMethodPath(decorator: Decorator): string {
-  const args = decorator.getArguments();
-  if (!args.length) {
-    return '';
-  }
-  return getLiteralPath(args[0]);
-}
-function joinPaths(...args: string[]): string {
-  return ['', ...args, '']
-    .join('/')
-    .replace(/\/{2,}/g, '/')
-    .replace(/(.+)\/$/, '$1');
-}
-function getMethodDecoratedParameters(
-  method: MethodDeclaration,
-): DecoratedParameter[] {
-  return method
-    .getParameters()
-    .map((p) => ({
-      parameter: p,
-      decorator: p
-        .getDecorators()
-        .find((e) => ParameterDecoratorsNames.includes(e.getName())),
-    }))
-    .filter((e) => e.decorator != null);
-}
-/**
- * Create a request expression(e.g. `http.request({url: '/users/${id}', method: 'get'})`)
- * @param verb Http request method
- * @param url Request url
- * @param parameters Mixed parameters to interpolate with
- */
-function createRequestStatement(
-  verb: string,
-  url: string,
-  parameters: DecoratedParameter[],
-): ts.Node {
-  const opts = createRequestOptions(verb, url, parameters);
-  const request = ts.factory.createPropertyAccessExpression(
-    ts.factory.createIdentifier('http'),
-    'request',
-  );
-  return ts.factory.createReturnStatement(
-    ts.factory.createCallExpression(request, null, [
-      ts.factory.createObjectLiteralExpression(Array.from(opts)),
-    ]),
-  );
-}
-/**
- * Create request options expression(e.g. `{url: '/users/${id}', method: 'get'}`)
- * @param verb Http request method
- * @param url Request url
- * @param parameters Mixed parameters to interpolate with
- */
-function* createRequestOptions(
-  verb: string,
-  url: string,
-  parameters: DecoratedParameter[],
-): Iterable<ts.ObjectLiteralElementLike> {
-  yield ts.factory.createPropertyAssignment(
-    'method',
-    ts.factory.createStringLiteral(verb),
-  );
-  yield ts.factory.createPropertyAssignment(
-    'url',
-    createUrlStringExpression(url, parameters),
-  );
-  const query = parameters.filter((e) => e.decorator.getName() === 'Query');
-  if (query.length) {
-    yield ts.factory.createPropertyAssignment(
-      'params',
-      createMergedObjectExpression(query),
-    );
-  }
-  /*
-  // usually headers are not passed per-method
-  const headers = parameters.filter((e) => e.decorator.getName() === 'Headers');
-  if (headers.length) {
-    yield ts.factory.createPropertyAssignment(
-      'headers',
-      createMergedObjectExpression(headers),
-    );
-  }
-  */
-  const body = parameters.filter((e) => e.decorator.getName() === 'Body');
-  if (body.length) {
-    yield ts.factory.createPropertyAssignment(
-      'data',
-      createMergedObjectExpression(body),
-    );
-  }
-}
-
-/**
- * Interpolate url path with parameters(e.g. `'/users/:id'` to `/users/${id}`)
- * @param url Original url with path parameters
- * @param parameters parameters to interpolate with
- * @returns Literal string or template string expression
- */
-function createUrlStringExpression(
-  url: string,
-  parameters: DecoratedParameter[],
-): ts.Expression {
-  const params = parameters.filter((e) => e.decorator.getName() === 'Param');
-  if (!params.length) {
-    return ts.factory.createStringLiteral(url);
-  }
-  const [head, ...spans] = url.split(/(?=:)/g);
-  return ts.factory.createTemplateExpression(
-    ts.factory.createTemplateHead(head),
-    spans.map((span, i) => {
-      const [exp, literal] = span.split(/\/(.+)/);
-      return ts.factory.createTemplateSpan(
-        ts.factory.createIdentifier(exp.slice(1)),
-        i < spans.length - 1
-          ? ts.factory.createTemplateMiddle('/' + literal)
-          : ts.factory.createTemplateTail(literal ? '/' + literal : ''),
-      );
-    }),
-  );
-}
-/**
- * Merge partially injected params. e.g. `@Body('name')` and `@Body('id')` to `{ name, id }`
- * @param parameters Legal parameters
- * @returns Merged object literal expression
- */
-function createMergedObjectExpression(
-  parameters: DecoratedParameter[],
-): ts.Expression {
-  const map = new Map<string, string>();
-  for (const param of parameters) {
-    const args = param.decorator.getArguments();
-    if (!args.length || args[0].getKind() !== SyntaxKind.StringLiteral) {
-      // if an injection without property name occurs(e.g. `@Body()`, `@Body(new ValidationPipe())`), return it immediately
-      return ts.factory.createIdentifier(param.parameter.getName());
-    }
-    const name = args[0].asKind(SyntaxKind.StringLiteral).getLiteralText();
-    map.set(name, param.parameter.getName());
-  }
-  return ts.factory.createObjectLiteralExpression(
-    Array.from(map).map(([k, v]) =>
-      ts.factory.createPropertyAssignment(k, ts.factory.createIdentifier(v)),
-    ),
-  );
 }
 
 export default NestjsParser;
