@@ -22,12 +22,7 @@ export abstract class Parser {
   /**
    * Create interfaces/enums from source files
    */
-  abstract getTypes(): Iterable<
-    | EnumDeclaration
-    | InterfaceDeclaration
-    | ClassDeclaration
-    | TypeAliasDeclaration
-  >;
+  abstract getTypes(): Iterable<Parser.TypeDeclaration>;
 }
 
 export namespace Parser {
@@ -50,6 +45,11 @@ export namespace Parser {
     property: string;
     parameter: ParameterDeclaration;
   }
+  export type TypeDeclaration =
+    | EnumDeclaration
+    | InterfaceDeclaration
+    | ClassDeclaration
+    | TypeAliasDeclaration;
 }
 
 export abstract class Writer {
